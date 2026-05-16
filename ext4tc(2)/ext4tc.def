@@ -1,0 +1,21 @@
+LIBRARY ext4tc
+
+EXPORTS
+    FsInit
+    FsGetDefRootName
+    FsFindFirst
+    FsFindNext
+    FsFindClose
+    FsGetFile
+    FsPutFile
+    FsDeleteFile
+    FsRemoveDir
+    FsMkDir
+    FsExecuteFile
+    FsRenMovFile
+    FsSetAttr
+    FsSetTime
+    FsStatusInfo
+    FsGetBackgroundFlags
+    FsLinksToLocalFiles
+    FsContentGetDefaultView

@@ -1,0 +1,18 @@
+# Сміття Visual Studio
+.vs/
+*.user
+*.suo
+*.db
+*.opendb
+
+# Папки з компільованим кодом
+x64/
+x86/
+Debug/
+Release/
+
+# Ігнор важких образів дисків
+*.img
+*.vhd
+*.vhdx
+*.iso
