@@ -276,6 +276,44 @@ static void ScanGpt(HANDLE hDrive, int driveIndex,
 }
 
 // -------------------------------------------------------
+//  Fallback: весь пристрій є одним Ext-розділом без таблиці.
+//  Типовий кейс: USB-флешка відформатована командою
+//  mkfs.ext4 /dev/sdX  (без розмітки розділів).
+// -------------------------------------------------------
+static void TryScanWholeDisk(HANDLE hDrive, int driveIndex,
+    std::vector<FoundPartition>& out) {
+    // Суперблок Ext знаходиться за байтовим зміщенням 1024 від початку диска,
+    // тобто в LBA 2 (сектор 2, якщо розмір сектора = 512 байт).
+    // IsExtSuperblock(hDrive, 0) перевіряє саме LBA 0+2 = LBA 2 — тобто зміщення 0
+    // означає "початок диска як розділу".
+    if (!IsExtSuperblock(hDrive, 0)) return;
+
+    uint64_t driveSize = GetDriveSize(hDrive);
+    if (driveSize == 0) return;
+
+    FoundPartition fp;
+    fp.driveIndex = driveIndex;
+    fp.partIndex = 0;        // 0 = немає таблиці розділів
+    fp.isGpt = false;
+    fp.partType = MBR_TYPE_LINUX;
+    fp.byteOffset = 0;        // суперблок прямо від початку диска
+    fp.byteSize = driveSize;
+
+    char drivePath[32];
+    _snprintf_s(drivePath, sizeof(drivePath), _TRUNCATE,
+        "\\\\.\\PhysicalDrive%d", driveIndex);
+    fp.drivePath = drivePath;
+
+    char name[64];
+    _snprintf_s(name, sizeof(name), _TRUNCATE,
+        "Drive%d [whole disk, ext, %s]",
+        driveIndex, FormatSize(driveSize).c_str());
+    fp.displayName = name;
+
+    out.push_back(fp);
+}
+
+// -------------------------------------------------------
 //  Головна функція сканування
 // -------------------------------------------------------
 std::vector<FoundPartition> ScanForExtPartitions(int maxDrives) {
@@ -313,8 +351,15 @@ std::vector<FoundPartition> ScanForExtPartitions(int maxDrives) {
             }
         }
 
-        // Звичайний MBR
+        // Звичайний MBR — шукаємо Linux-розділи (тип 0x83)
+        size_t before = result.size();
         ScanMbr(hDrive, i, result);
+
+        // Fallback: якщо MBR не дав жодного Ext-розділу —
+        // перевіряємо чи весь диск є одним Ext-томом (флешки без розмітки)
+        if (result.size() == before)
+            TryScanWholeDisk(hDrive, i, result);
+
         CloseHandle(hDrive);
     }
 
