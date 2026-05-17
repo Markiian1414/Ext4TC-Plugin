@@ -6,7 +6,7 @@
 #include <vector>
 #include <memory>
 #include <ctime>
-#include <functional> // <--- критично для компіляції
+#include <functional>
 
 #include "../io/disk_source.h"
 #include "ext_types.h"
@@ -45,7 +45,6 @@ public:
     bool WriteFile(const std::string& localPath, const std::string& extPath);
     bool MakeDir(const std::string& path);
 
-    // Перейменовано з DeleteFile (яке конфліктувало з WinAPI)
     bool RemoveFile(const std::string& path);
 
     bool GetInodeByPath(const std::string& path, ext2_inode& inode, uint32_t& inode_num,
