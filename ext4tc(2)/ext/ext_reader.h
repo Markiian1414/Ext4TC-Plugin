@@ -48,7 +48,8 @@ public:
     // Перейменовано з DeleteFile (яке конфліктувало з WinAPI)
     bool RemoveFile(const std::string& path);
 
-    bool GetInodeByPath(const std::string& path, ext2_inode& inode, uint32_t& inode_num);
+    bool GetInodeByPath(const std::string& path, ext2_inode& inode, uint32_t& inode_num,
+        int symlinkDepth = 0);
     std::string ReadSymlink(const ext2_inode& inode, uint32_t inode_num);
 
 private:

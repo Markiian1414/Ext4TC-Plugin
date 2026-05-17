@@ -226,6 +226,9 @@ static void ScanGpt(HANDLE hDrive, int driveIndex,
     if (hdr.numPartEntries == 0 || hdr.partEntrySize < sizeof(GptPartEntry))
         return;
     if (hdr.numPartEntries > 256) return; // захист від битого заголовка
+    // Захист від пошкодженого GPT: partEntrySize не може бути нульовим
+    // або нереалістично великим (стандарт: 128 байт, максимум розумний — 4096)
+    if (hdr.partEntrySize == 0 || hdr.partEntrySize > 4096) return;
 
     // Читаємо масив записів розділів (зазвичай 128 * 128 = 16384 байт = 32 сектори)
     uint32_t totalBytes = hdr.numPartEntries * hdr.partEntrySize;

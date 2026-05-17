@@ -91,6 +91,7 @@ private:
     std::unordered_map<HANDLE, FindHandle> m_findHandles;
     volatile LONG m_nextHandle;
     std::vector<FoundPartition> m_scannedPartitions;
+    DWORD m_lastScanTick = 0; // час останнього сканування дисків (GetTickCount)
 };
 
 #endif // PLUGIN_STATE_H

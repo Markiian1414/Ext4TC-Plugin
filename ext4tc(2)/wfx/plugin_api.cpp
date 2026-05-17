@@ -230,7 +230,7 @@ int __stdcall FsExecuteFile(HWND MainWin, char* RemoteName, char* Verb) {
 
                 return FS_EXEC_OK;
             }
-            MessageBoxA(MainWin, err.c_str(), "Mount Error", MB_ICONERROR | MB_OK);
+            MessageBoxA(MainWin, err.c_str(), "ext4tc \x97 Mount Error", MB_ICONERROR | MB_OK);
         }
         return FS_EXEC_OK;
     }
@@ -298,7 +298,37 @@ BOOL __stdcall FsMkDir(char* Path) {
 int __stdcall FsRenMovFile(char* Old, char* New, BOOL M, BOOL O, RemoteInfoStruct* ri) { return FS_FILE_NOTSUPPORTED; }
 BOOL __stdcall FsSetAttr(char* R, int A) { return FALSE; }
 BOOL __stdcall FsSetTime(char* R, FILETIME* C, FILETIME* A, FILETIME* W) { return FALSE; }
-void __stdcall FsStatusInfo(char* R, int I, int O) {}
+void __stdcall FsStatusInfo(char* RemoteDir, int InfoStartEnd, int Operation) {
+    // Total Commander викликає цю функцію на початку (InfoStartEnd=0)
+    // і наприкінці (InfoStartEnd=1) кожної операції з файлами.
+    // Використовуємо для логування стану фонових операцій.
+    auto& ps = PluginState::Get();
+    if (!ps.logProc) return;
+
+    // Назви операцій для лога (відповідають константам WFX API)
+    const char* opName = "Unknown";
+    switch (Operation) {
+    case 1:  opName = "List directory";  break;
+    case 2:  opName = "Get file";        break;
+    case 3:  opName = "Put file";        break;
+    case 4:  opName = "Rename/Move";     break;
+    case 5:  opName = "Delete";          break;
+    case 6:  opName = "Attributes";      break;
+    case 7:  opName = "Execute";         break;
+    case 8:  opName = "Calculate size";  break;
+    case 9:  opName = "Search";          break;
+    case 10: opName = "Search text";     break;
+    case 11: opName = "Synchronize";     break;
+    }
+
+    char msg[512];
+    _snprintf_s(msg, sizeof(msg), _TRUNCATE,
+        "ext4tc: %s — %s [%s]",
+        opName,
+        RemoteDir ? RemoteDir : "",
+        InfoStartEnd == 0 ? "start" : "end");
+    ps.Log(MSGTYPE_DETAILS, msg);
+}
 int __stdcall FsGetBackgroundFlags(void) { return BG_DOWNLOAD; }
 BOOL __stdcall FsLinksToLocalFiles(void) { return FALSE; }
 

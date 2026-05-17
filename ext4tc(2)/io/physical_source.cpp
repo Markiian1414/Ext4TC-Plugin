@@ -6,7 +6,8 @@
 
 PhysicalDiskSource::PhysicalDiskSource()
     : m_handle(INVALID_HANDLE_VALUE), m_readOnly(true),
-      m_sizeBytes(0), m_sectorSize(512) {}
+    m_sizeBytes(0), m_sectorSize(512) {
+}
 
 PhysicalDiskSource::~PhysicalDiskSource() { Close(); }
 
@@ -20,26 +21,28 @@ bool PhysicalDiskSource::Open(const std::string& path, bool readOnly) {
     MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, wp.data(), wlen);
 
     DWORD access = readOnly ? GENERIC_READ : GENERIC_READ | GENERIC_WRITE;
-    DWORD share  = FILE_SHARE_READ | FILE_SHARE_WRITE;
+    DWORD share = FILE_SHARE_READ | FILE_SHARE_WRITE;
 
     m_handle = CreateFileW(wp.c_str(), access, share, nullptr,
-                           OPEN_EXISTING,
-                           FILE_FLAG_NO_BUFFERING | FILE_FLAG_RANDOM_ACCESS,
-                           nullptr);
+        OPEN_EXISTING,
+        FILE_FLAG_NO_BUFFERING | FILE_FLAG_RANDOM_ACCESS,
+        nullptr);
     if (m_handle == INVALID_HANDLE_VALUE) return false;
 
     DWORD ret = 0;
     DISK_GEOMETRY_EX geom{};
     if (DeviceIoControl(m_handle, IOCTL_DISK_GET_DRIVE_GEOMETRY_EX,
-                        nullptr, 0, &geom, sizeof(geom), &ret, nullptr)) {
+        nullptr, 0, &geom, sizeof(geom), &ret, nullptr)) {
         m_sectorSize = geom.Geometry.BytesPerSector;
-        m_sizeBytes  = (uint64_t)geom.DiskSize.QuadPart;
-    } else {
+        m_sizeBytes = (uint64_t)geom.DiskSize.QuadPart;
+    }
+    else {
         PARTITION_INFORMATION_EX pi{};
         if (DeviceIoControl(m_handle, IOCTL_DISK_GET_PARTITION_INFO_EX,
-                            nullptr, 0, &pi, sizeof(pi), &ret, nullptr)) {
+            nullptr, 0, &pi, sizeof(pi), &ret, nullptr)) {
             m_sizeBytes = (uint64_t)pi.PartitionLength.QuadPart;
-        } else {
+        }
+        else {
             Close(); return false;
         }
     }
@@ -60,12 +63,16 @@ uint64_t PhysicalDiskSource::GetSizeBytes() const { return m_sizeBytes; }
 
 int64_t PhysicalDiskSource::ReadBytes(uint64_t offset, void* buf, uint32_t count) {
     if (!IsOpen() || !buf || !count) return -1;
+    // Захист від читання за межами диска
+    if (m_sizeBytes > 0 && offset >= m_sizeBytes) return -1;
+    if (m_sizeBytes > 0 && offset + count > m_sizeBytes)
+        count = (uint32_t)(m_sizeBytes - offset);
 
-    uint64_t sector     = m_sectorSize;
+    uint64_t sector = m_sectorSize;
     uint64_t alignedOff = (offset / sector) * sector;
-    uint32_t skip       = (uint32_t)(offset - alignedOff);
-    uint32_t total      = skip + count;
-    uint32_t readSize   = (uint32_t)(((total + sector - 1) / sector) * sector);
+    uint32_t skip = (uint32_t)(offset - alignedOff);
+    uint32_t total = skip + count;
+    uint32_t readSize = (uint32_t)(((total + sector - 1) / sector) * sector);
 
     // VirtualAlloc gives sector-aligned memory
     void* tmp = VirtualAlloc(nullptr, readSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
@@ -75,12 +82,13 @@ int64_t PhysicalDiskSource::ReadBytes(uint64_t offset, void* buf, uint32_t count
     SetFilePointerEx(m_handle, li, nullptr, FILE_BEGIN);
 
     DWORD got = 0;
-    BOOL  ok  = ReadFile(m_handle, tmp, readSize, &got, nullptr);
+    BOOL  ok = ReadFile(m_handle, tmp, readSize, &got, nullptr);
     int64_t result = -1;
     if (ok && got >= skip + count) {
         memcpy(buf, (uint8_t*)tmp + skip, count);
         result = count;
-    } else if (ok && got > skip) {
+    }
+    else if (ok && got > skip) {
         uint32_t have = got - skip;
         memcpy(buf, (uint8_t*)tmp + skip, have);
         result = have;

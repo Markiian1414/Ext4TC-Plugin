@@ -84,6 +84,48 @@ static INT_PTR CALLBACK MountDlgProc(HWND hDlg, UINT msg,
             if (!data->isConfig) {
                 char buf[MAX_PATH]{};
                 GetDlgItemTextA(hDlg, IDC_EDIT_PATH, buf, MAX_PATH);
+
+                // --- Валідація шляху ---
+
+                // 1. Порожній рядок
+                if (buf[0] == '\0') {
+                    MessageBoxA(hDlg,
+                        "Please enter a path to a disk image or physical drive.\n"
+                        "Example: C:\\disk.img  or  \\\\.\\PhysicalDrive1",
+                        "Path is empty", MB_ICONWARNING | MB_OK);
+                    SetFocus(GetDlgItem(hDlg, IDC_EDIT_PATH));
+                    break; // залишаємось у діалозі
+                }
+
+                // 2. Фізичний диск (\\.\ prefix) — не перевіряємо через GetFileAttributes,
+                //    бо він не працює для \\.\PhysicalDriveN без відкриття.
+                //    Просто перевіряємо формат рядка.
+                bool isPhysical = (buf[0] == '\\' && buf[1] == '\\' &&
+                    buf[2] == '.' && buf[3] == '\\');
+
+                if (!isPhysical) {
+                    // 3. Файловий образ — перевіряємо що файл існує
+                    DWORD attr = GetFileAttributesA(buf);
+                    if (attr == INVALID_FILE_ATTRIBUTES) {
+                        char msg[512];
+                        _snprintf_s(msg, sizeof(msg), _TRUNCATE,
+                            "File not found or access denied:\n%s\n\n"
+                            "Please check the path and try again.", buf);
+                        MessageBoxA(hDlg, msg, "Invalid Path", MB_ICONWARNING | MB_OK);
+                        SetFocus(GetDlgItem(hDlg, IDC_EDIT_PATH));
+                        break;
+                    }
+                    // 4. Не передали папку замість файлу
+                    if (attr & FILE_ATTRIBUTE_DIRECTORY) {
+                        MessageBoxA(hDlg,
+                            "The specified path is a folder, not a disk image file.\n"
+                            "Please select an .img, .bin or .raw file.",
+                            "Invalid Path", MB_ICONWARNING | MB_OK);
+                        SetFocus(GetDlgItem(hDlg, IDC_EDIT_PATH));
+                        break;
+                    }
+                }
+
                 data->cfg->mountPath = buf;
             }
             data->cfg->readOnly =
@@ -118,7 +160,9 @@ static HGLOBAL BuildDialogTemplate(bool isMount)
     const short itemCount = isMount ? 6 : 3;
     const short dlgH = isMount ? 78 : 58;
 
-    HGLOBAL hMem = GlobalAlloc(GMEM_ZEROINIT, 4096);
+    // Буфер збільшено до 8192 байт: при довгих рядках (локалізація, широкі назви)
+    // 4096 може не вистачити і запис вийде за межі виділеної пам'яті
+    HGLOBAL hMem = GlobalAlloc(GMEM_ZEROINIT, 8192);
     if (!hMem) return nullptr;
     WORD* p = (WORD*)GlobalLock(hMem);
     if (!p) { GlobalFree(hMem); return nullptr; }

@@ -112,6 +112,9 @@ bool ExtReader::CollectExtents(const ext2_inode& inode,
     std::function<bool(const uint8_t*, int)> traverse =
         [&](const uint8_t* node, int depth) -> bool {
         const auto* h = (const ext4_extent_header*)node;
+        // Захист від пошкодженого заголовку: надто багато записів
+        // (в одному блоці 4096 байт максимум (4096-12)/12 = 340 extent'ів)
+        if (h->eh_entries > 340) return false;
         if (h->eh_depth == 0) {
             const auto* ext = (const ext4_extent*)(node + sizeof(ext4_extent_header));
             for (int i = 0; i < h->eh_entries; i++) {
@@ -188,6 +191,9 @@ bool ExtReader::ReadFileData(const ext2_inode& inode, uint32_t inodeNum,
     std::vector<std::pair<uint64_t, uint64_t>> extents;
     if (!GetFileBlocks(inode, extents)) return false;
 
+    // Якщо файл має розмір, але жодного блоку не знайдено — пошкоджена ФС
+    if (extents.empty() && fileSize > 0) return false;
+
     out.resize((size_t)fileSize);
     uint64_t written = 0;
 
@@ -212,7 +218,9 @@ bool ExtReader::ParseDirectory(const ext2_inode& dirInode, uint32_t inodeNum,
     size_t pos = 0;
     while (pos + 8 <= data.size()) {
         const auto* de = (const ext2_dir_entry*)(data.data() + pos);
-        if (de->rec_len == 0) break;
+        // Захист від пошкодженого запису: rec_len < 8 або не вирівняний
+        // призведе до нескінченного циклу або виходу за межі буфера
+        if (de->rec_len < 8) break;
 
         if (de->inode != 0 && de->name_len > 0) {
             std::string name(de->name, de->name_len);
@@ -265,7 +273,7 @@ bool ExtReader::LookupInDir(const ext2_inode& dirInode, uint32_t dirInum,
     size_t pos = 0;
     while (pos + 8 <= data.size()) {
         const auto* de = (const ext2_dir_entry*)(data.data() + pos);
-        if (de->rec_len == 0) break;
+        if (de->rec_len < 8) break;
         if (de->inode != 0 && de->name_len == name.size() &&
             memcmp(de->name, name.c_str(), de->name_len) == 0) {
             foundInum = de->inode;
@@ -277,7 +285,11 @@ bool ExtReader::LookupInDir(const ext2_inode& dirInode, uint32_t dirInum,
 }
 
 bool ExtReader::GetInodeByPath(const std::string& path,
-    ext2_inode& inode, uint32_t& inode_num) {
+    ext2_inode& inode, uint32_t& inode_num, int symlinkDepth) {
+    // Захист від циклічних символічних посилань: максимальна глибина = 40
+    // (відповідає поведінці ядра Linux — MAXSYMLINKS)
+    if (symlinkDepth > 40) return false;
+
     auto parts = SplitPath(path);
     uint32_t curInum = EXT2_ROOT_INO;
 
@@ -295,7 +307,7 @@ bool ExtReader::GetInodeByPath(const std::string& path,
             if (!target.empty()) {
                 uint32_t linkInum = 0;
                 ext2_inode linkInode{};
-                if (GetInodeByPath(target, linkInode, linkInum)) {
+                if (GetInodeByPath(target, linkInode, linkInum, symlinkDepth + 1)) {
                     inode = linkInode;
                     curInum = linkInum;
                 }
