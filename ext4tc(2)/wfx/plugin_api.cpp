@@ -126,7 +126,7 @@ HANDLE __stdcall FsFindFirst(char* Path, WIN32_FIND_DATAA* FindData) {
 
         // 3. Кнопка ручного монтування
         ExtEntry mountEntry{};
-        mountEntry.name = "< Mount new volume >";
+        mountEntry.name = L10n::S("mount_new_entry"); // <--- ВИКОРИСТОВУЄМО lang.h
         mountEntry.is_dir = false;
         mountEntry.mtime = 0;
         fh.entries.push_back(mountEntry);
@@ -193,13 +193,15 @@ int __stdcall FsFindClose(HANDLE Hdl) {
     PluginState::Get().FreeFindHandle(Hdl);
     return 0;
 }
-
 int __stdcall FsExecuteFile(HWND MainWin, char* RemoteName, char* Verb) {
     auto& ps = PluginState::Get();
     std::string remote = RemoteName ? RemoteName : "";
     std::string verb = Verb ? Verb : "";
 
-    if (remote.find("< Mount new volume >") != std::string::npos) {
+    // Перевіряємо обидва варіанти (на випадок якщо мова щойно змінилася)
+    if (remote.find(L10n::S("mount_new_entry")) != std::string::npos ||
+        remote.find("< Mount new volume >") != std::string::npos) {
+
         PluginConfig cfg;
         cfg.readOnly = ps.defaultReadOnly;
         cfg.encoding = ps.defaultEncoding;
@@ -237,6 +239,23 @@ int __stdcall FsExecuteFile(HWND MainWin, char* RemoteName, char* Verb) {
 
     if (verb == "properties") {
         std::string volId, sub; ps.ParsePath(remote, volId, sub);
+
+        // 1. Якщо це корінь плагіна (користувач натиснув Alt+Enter на [Ext2/3/4 Filesystem])
+        if (volId.empty() && sub == "/") {
+            PluginConfig cfg;
+            cfg.readOnly = ps.defaultReadOnly;
+            cfg.encoding = ps.defaultEncoding;
+
+            if (ShowConfigDialog(MainWin, cfg)) {
+                // Зберігаємо налаштування
+                ps.defaultReadOnly = cfg.readOnly;
+                ps.defaultEncoding = cfg.encoding;
+                ps.SaveConfig();
+            }
+            return FS_EXEC_OK;
+        }
+
+        // 2. Якщо це конкретний файл/папка всередині змонтованого тому
         MountedVolume* vol = ps.FindVolume(volId);
         if (vol) {
             ext2_inode inode{}; uint32_t inum = 0;
@@ -244,7 +263,8 @@ int __stdcall FsExecuteFile(HWND MainWin, char* RemoteName, char* Verb) {
                 char info[512];
                 uint64_t sz = inode.i_size_lo | ((uint64_t)inode.i_size_hi << 32);
                 sprintf_s(info, sizeof(info), "Path: %s\nInode: %u\nSize: %llu bytes\n", sub.c_str(), inum, (unsigned long long)sz);
-                MessageBoxA(MainWin, info, "Properties", MB_ICONINFORMATION | MB_OK);
+                // Локалізував заодно заголовок вікна
+                MessageBoxA(MainWin, info, L10n::S("prop_title"), MB_ICONINFORMATION | MB_OK);
             }
         }
         return FS_EXEC_OK;
@@ -332,6 +352,7 @@ void __stdcall FsStatusInfo(char* RemoteDir, int InfoStartEnd, int Operation) {
 int __stdcall FsGetBackgroundFlags(void) { return BG_DOWNLOAD; }
 BOOL __stdcall FsLinksToLocalFiles(void) { return FALSE; }
 
+
 BOOL __stdcall FsContentGetDefaultView(char* VC, char* VH, char* VW, char* VO, int maxlen) {
     strncpy_s(VC, maxlen, "[=tc.size]\n[=tc.writedate]\n[tc.attr]", maxlen - 1);
     strncpy_s(VH, maxlen, "Size\nDate\nAttr", maxlen - 1);
@@ -339,3 +360,68 @@ BOOL __stdcall FsContentGetDefaultView(char* VC, char* VH, char* VW, char* VO, i
     strncpy_s(VO, maxlen, "0", maxlen - 1);
     return TRUE;
 }
+
+// =======================================================
+// UNICODE WRAPPERS (Дозволяють TC бачити кирилицю)
+// =======================================================
+
+static std::wstring Utf8ToWstr(const std::string& utf8) {
+    if (utf8.empty()) return L"";
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, nullptr, 0);
+    std::wstring wstr(wlen, 0);
+    MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, &wstr[0], wlen);
+    return wstr;
+}
+
+static std::string WstrToUtf8(const wchar_t* wstr) {
+    if (!wstr) return "";
+    int len = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, nullptr, 0, nullptr, nullptr);
+    std::string str(len, 0);
+    WideCharToMultiByte(CP_UTF8, 0, wstr, -1, &str[0], len, nullptr, nullptr);
+    return str;
+}
+
+extern "C" {
+
+    __declspec(dllexport) HANDLE __stdcall FsFindFirstW(WCHAR* Path, WIN32_FIND_DATAW* FindData) {
+        std::string utf8Path = WstrToUtf8(Path);
+        WIN32_FIND_DATAA fdA{};
+        HANDLE h = FsFindFirst((char*)utf8Path.c_str(), &fdA);
+        if (h != INVALID_HANDLE_VALUE) {
+            memset(FindData, 0, sizeof(*FindData));
+            std::wstring wName = Utf8ToWstr(fdA.cFileName);
+            wcscpy_s(FindData->cFileName, MAX_PATH, wName.c_str());
+            FindData->dwFileAttributes = fdA.dwFileAttributes;
+            FindData->nFileSizeHigh = fdA.nFileSizeHigh;
+            FindData->nFileSizeLow = fdA.nFileSizeLow;
+            FindData->ftCreationTime = fdA.ftCreationTime;
+            FindData->ftLastAccessTime = fdA.ftLastAccessTime;
+            FindData->ftLastWriteTime = fdA.ftLastWriteTime;
+        }
+        return h;
+    }
+
+    __declspec(dllexport) BOOL __stdcall FsFindNextW(HANDLE Hdl, WIN32_FIND_DATAW* FindData) {
+        WIN32_FIND_DATAA fdA{};
+        BOOL res = FsFindNext(Hdl, &fdA);
+        if (res) {
+            memset(FindData, 0, sizeof(*FindData));
+            std::wstring wName = Utf8ToWstr(fdA.cFileName);
+            wcscpy_s(FindData->cFileName, MAX_PATH, wName.c_str());
+            FindData->dwFileAttributes = fdA.dwFileAttributes;
+            FindData->nFileSizeHigh = fdA.nFileSizeHigh;
+            FindData->nFileSizeLow = fdA.nFileSizeLow;
+            FindData->ftCreationTime = fdA.ftCreationTime;
+            FindData->ftLastAccessTime = fdA.ftLastAccessTime;
+            FindData->ftLastWriteTime = fdA.ftLastWriteTime;
+        }
+        return res;
+    }
+
+    __declspec(dllexport) int __stdcall FsExecuteFileW(HWND MainWin, WCHAR* RemoteName, WCHAR* Verb) {
+        std::string remote = WstrToUtf8(RemoteName);
+        std::string verb = WstrToUtf8(Verb);
+        return FsExecuteFile(MainWin, (char*)remote.c_str(), (char*)verb.c_str());
+    }
+
+} // кінець extern "C"

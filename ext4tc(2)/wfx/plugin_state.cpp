@@ -1,6 +1,7 @@
 #include "plugin_state.h"
 #include "io/disk_source.h"
 #include "io/disk_scanner.h"
+#include "lang.h"
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <shlwapi.h>
@@ -19,7 +20,7 @@ PluginState& PluginState::Get() {
 PluginState::PluginState()
     : pluginNr(0), progressProc(nullptr), logProc(nullptr),
     requestProc(nullptr), defaultReadOnly(true),
-    defaultEncoding("UTF-8"), m_nextHandle(1)
+    defaultEncoding("UTF-8"), defaultLanguage("EN"), m_nextHandle(1)
 {
 }
 
@@ -41,6 +42,11 @@ void PluginState::LoadConfig() {
 
     GetPrivateProfileStringA("General", "Encoding", "UTF-8", buf, sizeof(buf), configPath.c_str());
     defaultEncoding = buf;
+
+    // Мова інтерфейсу: "EN" або "UK", за замовчуванням EN
+    GetPrivateProfileStringA("General", "Language", "EN", buf, sizeof(buf), configPath.c_str());
+    defaultLanguage = buf;
+    L10n::SetLanguage(defaultLanguage);
 }
 
 void PluginState::SaveConfig() {
@@ -48,6 +54,10 @@ void PluginState::SaveConfig() {
         defaultReadOnly ? "1" : "0", configPath.c_str());
     WritePrivateProfileStringA("General", "Encoding",
         defaultEncoding.c_str(), configPath.c_str());
+    WritePrivateProfileStringA("General", "Language",
+        defaultLanguage.c_str(), configPath.c_str());
+    // Застосовуємо мову одразу після збереження
+    L10n::SetLanguage(defaultLanguage);
 }
 
 bool PluginState::MountVolume(const std::string& sourcePath,
@@ -61,10 +71,7 @@ bool PluginState::MountVolume(const std::string& sourcePath,
     try {
         std::shared_ptr<IDiskSource> src = CreateDiskSource(sourcePath, readOnly);
         if (!src) {
-            errorMsg = "Cannot open file or device:\n" + sourcePath +
-                "\n\nMake sure the path is correct and you have "
-                "sufficient access rights (run as Administrator for "
-                "physical drives).";
+            errorMsg = L10n::Fmt(L10n::S("err_no_src"), "{PATH}", sourcePath);
             return false;
         }
 
@@ -86,23 +93,10 @@ bool PluginState::MountVolume(const std::string& sourcePath,
                     sourcePath[0] == '\\' && sourcePath[1] == '\\' &&
                     sourcePath[2] == '.' && sourcePath[3] == '\\');
                 if (isPhysical) {
-                    errorMsg =
-                        "No Ext2/3/4 filesystem found on:\n" + sourcePath +
-                        "\n\nThe device does not contain a valid Ext superblock "
-                        "at the expected offset.\n"
-                        "Possible reasons:\n"
-                        "  \x95 Wrong drive index (try PhysicalDrive0, 1, 2\x85)\n"
-                        "  \x95 Partition offset is incorrect\n"
-                        "  \x95 The drive is formatted with a different filesystem";
+                    errorMsg = L10n::Fmt(L10n::S("err_sig_physical"), "{PATH}", sourcePath);
                 }
                 else {
-                    errorMsg =
-                        "This file is not a valid Ext2/3/4 disk image:\n" +
-                        sourcePath +
-                        "\n\nExt superblock signature (0xEF53) not found.\n"
-                        "Only raw disk images (.img, .bin, .raw) are supported.\n"
-                        "ISO, VMDK, VHDX and other container formats "
-                        "are not supported directly.";
+                    errorMsg = L10n::Fmt(L10n::S("err_sig_file"), "{PATH}", sourcePath);
                 }
                 return false;
             }
@@ -110,14 +104,7 @@ bool PluginState::MountVolume(const std::string& sourcePath,
 
         auto reader = std::make_shared<ExtReader>();
         if (!reader->Mount(src, partOffset)) {
-            // Сигнатура є, але повний розбір провалився — пошкоджена ФС
-            errorMsg =
-                "Ext2/3/4 signature found, but the filesystem appears to be "
-                "corrupted or incomplete.\n\n"
-                "Possible reasons:\n"
-                "  \x95 Superblock is damaged\n"
-                "  \x95 Wrong partition offset specified\n"
-                "  \x95 The image was created incorrectly (partial dump)";
+            errorMsg = L10n::S("err_fs_corrupt");
             return false;
         }
 
@@ -174,8 +161,8 @@ void PluginState::ScanDisks() {
     m_scannedPartitions = std::move(found);
     m_lastScanTick = GetTickCount();
     Log(MSGTYPE_DETAILS,
-        "ext4tc: disk scan found " +
-        std::to_string(m_scannedPartitions.size()) + " Ext partition(s)");
+        L10n::Fmt(L10n::S("log_scan_found"), "{N}",
+            std::to_string(m_scannedPartitions.size())));
 }
 
 MountedVolume* PluginState::FindVolume(const std::string& id) {

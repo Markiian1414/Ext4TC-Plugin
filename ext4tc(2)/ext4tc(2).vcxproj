@@ -40,6 +40,7 @@
     <ClInclude Include="io\disk_source.h" />
     <ClInclude Include="io\image_source.h" />
     <ClInclude Include="io\physical_source.h" />
+    <ClInclude Include="wfx\lang.h" />
     <ClInclude Include="wfx\plugin_state.h" />
     <ClInclude Include="wfx\wfxplugin.h" />
   </ItemGroup>

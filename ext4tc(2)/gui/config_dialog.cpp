@@ -5,6 +5,7 @@
 #include <string>
 #include "config_dialog.h"
 #include "../wfx/plugin_state.h"
+#include "../wfx/lang.h"
 
 #pragma comment(lib, "comdlg32.lib")
 
@@ -32,10 +33,14 @@
 #define IDC_BTN_BROWSE   102
 #define IDC_CHK_READONLY 104
 #define IDC_STATIC_PATH  106
+#define IDC_RADIO_EN     107   // Radio: English
+#define IDC_RADIO_UK     108   // Radio: Українська
+#define IDC_STATIC_LANG  109   // Label "Language:"
 
 struct MountDlgData {
     PluginConfig* cfg;
     bool          isConfig; // true = ShowConfigDialog (без Path/Browse)
+    std::string   language; // поточна мова ("EN"/"UK"), для config-діалогу
 };
 
 static INT_PTR CALLBACK MountDlgProc(HWND hDlg, UINT msg,
@@ -57,6 +62,11 @@ static INT_PTR CALLBACK MountDlgProc(HWND hDlg, UINT msg,
             ShowWindow(GetDlgItem(hDlg, IDC_STATIC_PATH), SW_HIDE);
             ShowWindow(GetDlgItem(hDlg, IDC_EDIT_PATH), SW_HIDE);
             ShowWindow(GetDlgItem(hDlg, IDC_BTN_BROWSE), SW_HIDE);
+
+            // Встановлюємо відмітку поточної мови
+            bool isUK = (data->language == "UK");
+            CheckDlgButton(hDlg, IDC_RADIO_EN, isUK ? BST_UNCHECKED : BST_CHECKED);
+            CheckDlgButton(hDlg, IDC_RADIO_UK, isUK ? BST_CHECKED : BST_UNCHECKED);
         }
         return TRUE;
     }
@@ -70,13 +80,14 @@ static INT_PTR CALLBACK MountDlgProc(HWND hDlg, UINT msg,
             char fileBuf[MAX_PATH]{};
             ofn.lStructSize = sizeof(ofn);
             ofn.hwndOwner = hDlg;
+            // Фільтр: нема нульових байт у рядку C — треба передати буфер вручну
             ofn.lpstrFilter =
                 "Disk images (*.img;*.bin;*.raw)\0*.img;*.bin;*.raw\0"
                 "All files (*.*)\0*.*\0";
             ofn.lpstrFile = fileBuf;
             ofn.nMaxFile = MAX_PATH;
             ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
-            ofn.lpstrTitle = "Select Ext2/3/4 disk image";
+            ofn.lpstrTitle = L10n::S("dlg_browse_title");
             if (GetOpenFileNameA(&ofn))
                 SetDlgItemTextA(hDlg, IDC_EDIT_PATH, fileBuf);
         }
@@ -85,42 +96,33 @@ static INT_PTR CALLBACK MountDlgProc(HWND hDlg, UINT msg,
                 char buf[MAX_PATH]{};
                 GetDlgItemTextA(hDlg, IDC_EDIT_PATH, buf, MAX_PATH);
 
-                // --- Валідація шляху ---
-
                 // 1. Порожній рядок
                 if (buf[0] == '\0') {
                     MessageBoxA(hDlg,
-                        "Please enter a path to a disk image or physical drive.\n"
-                        "Example: C:\\disk.img  or  \\\\.\\PhysicalDrive1",
-                        "Path is empty", MB_ICONWARNING | MB_OK);
+                        L10n::S("val_empty_text"),
+                        L10n::S("val_empty_title"),
+                        MB_ICONWARNING | MB_OK);
                     SetFocus(GetDlgItem(hDlg, IDC_EDIT_PATH));
-                    break; // залишаємось у діалозі
+                    break;
                 }
 
-                // 2. Фізичний диск (\\.\ prefix) — не перевіряємо через GetFileAttributes,
-                //    бо він не працює для \\.\PhysicalDriveN без відкриття.
-                //    Просто перевіряємо формат рядка.
                 bool isPhysical = (buf[0] == '\\' && buf[1] == '\\' &&
                     buf[2] == '.' && buf[3] == '\\');
 
                 if (!isPhysical) {
-                    // 3. Файловий образ — перевіряємо що файл існує
                     DWORD attr = GetFileAttributesA(buf);
                     if (attr == INVALID_FILE_ATTRIBUTES) {
-                        char msg[512];
-                        _snprintf_s(msg, sizeof(msg), _TRUNCATE,
-                            "File not found or access denied:\n%s\n\n"
-                            "Please check the path and try again.", buf);
-                        MessageBoxA(hDlg, msg, "Invalid Path", MB_ICONWARNING | MB_OK);
+                        std::string msg = L10n::Fmt(L10n::S("val_notfound_text"), "{PATH}", buf);
+                        MessageBoxA(hDlg, msg.c_str(),
+                            L10n::S("val_notfound_title"), MB_ICONWARNING | MB_OK);
                         SetFocus(GetDlgItem(hDlg, IDC_EDIT_PATH));
                         break;
                     }
-                    // 4. Не передали папку замість файлу
                     if (attr & FILE_ATTRIBUTE_DIRECTORY) {
                         MessageBoxA(hDlg,
-                            "The specified path is a folder, not a disk image file.\n"
-                            "Please select an .img, .bin or .raw file.",
-                            "Invalid Path", MB_ICONWARNING | MB_OK);
+                            L10n::S("val_isdir_text"),
+                            L10n::S("val_isdir_title"),
+                            MB_ICONWARNING | MB_OK);
                         SetFocus(GetDlgItem(hDlg, IDC_EDIT_PATH));
                         break;
                     }
@@ -128,6 +130,12 @@ static INT_PTR CALLBACK MountDlgProc(HWND hDlg, UINT msg,
 
                 data->cfg->mountPath = buf;
             }
+            else {
+                // Config-режим: зберігаємо вибрану мову
+                bool ukSelected = (IsDlgButtonChecked(hDlg, IDC_RADIO_UK) == BST_CHECKED);
+                data->language = ukSelected ? "UK" : "EN";
+            }
+
             data->cfg->readOnly =
                 (IsDlgButtonChecked(hDlg, IDC_CHK_READONLY) == BST_CHECKED);
             EndDialog(hDlg, IDOK);
@@ -155,13 +163,10 @@ static INT_PTR CALLBACK MountDlgProc(HWND hDlg, UINT msg,
 // -------------------------------------------------------
 static HGLOBAL BuildDialogTemplate(bool isMount)
 {
-    // Mount: 6 контролів (label + edit + browse + checkbox + OK + Cancel)
-    // Config: 3 контролів (checkbox + OK + Cancel)
-    const short itemCount = isMount ? 6 : 3;
-    const short dlgH = isMount ? 78 : 58;
+    // Mount: 6 контролів; Config: 6 (checkbox + label + 2 radio + OK + Cancel)
+    const short itemCount = isMount ? 6 : 6;
+    const short dlgH = isMount ? 78 : 78; // Config тепер вищий — є рядок мови
 
-    // Буфер збільшено до 8192 байт: при довгих рядках (локалізація, широкі назви)
-    // 4096 може не вистачити і запис вийде за межі виділеної пам'яті
     HGLOBAL hMem = GlobalAlloc(GMEM_ZEROINIT, 8192);
     if (!hMem) return nullptr;
     WORD* p = (WORD*)GlobalLock(hMem);
@@ -180,16 +185,25 @@ static HGLOBAL BuildDialogTemplate(bool isMount)
     // menu (empty), class (default), title
     *p++ = 0;
     *p++ = 0;
-    const wchar_t* title = isMount ? L"Mount Ext2/3/4 Volume"
-        : L"Ext4TC Plugin Settings";
-    wcscpy((wchar_t*)p, title);
-    p += wcslen(title) + 1;
+
+    // Заголовок діалогу через локалізацію (конвертуємо з ASCII у UTF-16)
+    const char* titleA = isMount ? L10n::S("dlg_mount_title")
+        : L10n::S("dlg_config_title");
+    wchar_t titleW[128]{};
+    MultiByteToWideChar(CP_UTF8, 0, titleA, -1, titleW, 128);
+    wcscpy((wchar_t*)p, titleW);
+    p += wcslen(titleW) + 1;
 
     // 9pt Segoe UI
     *p++ = 9;
     wcscpy((wchar_t*)p, L"Segoe UI");
     p += wcslen(L"Segoe UI") + 1;
     if ((uintptr_t)p & 2) p++;
+
+    // Допоміжна лямбда для конвертації рядків локалізації у wchar_t
+    auto toW = [](const char* src, wchar_t* dst, int dstLen) {
+        MultiByteToWideChar(CP_UTF8, 0, src, -1, dst, dstLen);
+        };
 
     auto addItem = [&](short x, short y, short cx, short cy,
         WORD id, DWORD style, DWORD exStyle,
@@ -207,75 +221,90 @@ static HGLOBAL BuildDialogTemplate(bool isMount)
             *p++ = 0;
         };
 
+    // Варіант addItem з char* (локалізований рядок)
+    auto addItemA = [&](short x, short y, short cx, short cy,
+        WORD id, DWORD style, DWORD exStyle,
+        const wchar_t* cls, const char* textA)
+        {
+            wchar_t textW[256]{};
+            MultiByteToWideChar(CP_UTF8, 0, textA, -1, textW, 256);
+            addItem(x, y, cx, cy, id, style, exStyle, cls, textW);
+        };
+
     // --- Розрахунок координат ---
-    //  Робоча ширина: DLG_W - 2*DLG_PAD = 296
-    //  Browse: ширина 54, притиснутий до правого краю
-    //  Path edit: від (PAD + labelW + 4) до лівого краю Browse мінус 4
-    //  Кнопки: правий Cancel впритул до правого краю, Mount зліва від нього
-
     const short PAD = DLG_PAD;
-    const short INNER = DLG_W - 2 * PAD;   // 296
-
+    const short INNER = DLG_W - 2 * PAD;
     const short BROWSE_W = 54;
-    const short BROWSE_X = DLG_W - PAD - BROWSE_W;         // 254
+    const short BROWSE_X = DLG_W - PAD - BROWSE_W;
     const short LABEL_W = 32;
-    const short EDIT_X = PAD + LABEL_W + 4;              //  48
-    const short EDIT_W = BROWSE_X - EDIT_X - 4;          // 202
-
-    // кнопки вирівняні по правому краю
-    const short BTN2_X = DLG_W - PAD - DLG_BTN_W;       // 258
-    const short BTN1_X = BTN2_X - DLG_BTN_GAP - DLG_BTN_W; // 202
+    const short EDIT_X = PAD + LABEL_W + 4;
+    const short EDIT_W = BROWSE_X - EDIT_X - 4;
+    const short BTN2_X = DLG_W - PAD - DLG_BTN_W;
+    const short BTN1_X = BTN2_X - DLG_BTN_GAP - DLG_BTN_W;
 
     if (isMount) {
         // Рядок 1 — Path (y=14)
         const short R1 = DLG_FIRST_ROW;
-        // лейбл центруємо по висоті відносно edit (h=12): зміщення +2
-        addItem(PAD, R1 + 2, LABEL_W, 8,
-            IDC_STATIC_PATH,
-            SS_LEFT | SS_CENTERIMAGE, 0,
-            L"STATIC", L"Path:");
+        addItemA(PAD, R1 + 2, LABEL_W, 8,
+            IDC_STATIC_PATH, SS_LEFT | SS_CENTERIMAGE, 0,
+            L"STATIC", L10n::S("dlg_path_label"));
         addItem(EDIT_X, R1, EDIT_W, 12,
             IDC_EDIT_PATH,
-            WS_BORDER | ES_AUTOHSCROLL | WS_TABSTOP,
-            WS_EX_CLIENTEDGE,
+            WS_BORDER | ES_AUTOHSCROLL | WS_TABSTOP, WS_EX_CLIENTEDGE,
             L"EDIT", L"");
-        addItem(BROWSE_X, R1, BROWSE_W, 12,
-            IDC_BTN_BROWSE,
-            BS_PUSHBUTTON | WS_TABSTOP, 0,
-            L"BUTTON", L"Browse...");
+        addItemA(BROWSE_X, R1, BROWSE_W, 12,
+            IDC_BTN_BROWSE, BS_PUSHBUTTON | WS_TABSTOP, 0,
+            L"BUTTON", L10n::S("dlg_browse_btn"));
 
         // Рядок 2 — Read-only (y=34)
         const short R2 = R1 + DLG_ROW_H;
-        addItem(PAD, R2, INNER, 10,
-            IDC_CHK_READONLY,
-            BS_AUTOCHECKBOX | WS_TABSTOP, 0,
-            L"BUTTON", L"Read-only access");
+        addItemA(PAD, R2, INNER, 10,
+            IDC_CHK_READONLY, BS_AUTOCHECKBOX | WS_TABSTOP, 0,
+            L"BUTTON", L10n::S("dlg_readonly_chk"));
 
         // Рядок 3 — кнопки (y=50)
         const short R3 = R2 + DLG_ROW_H - 4;
-        addItem(BTN1_X, R3, DLG_BTN_W, DLG_BTN_H,
+        addItemA(BTN1_X, R3, DLG_BTN_W, DLG_BTN_H,
             IDOK, BS_DEFPUSHBUTTON | WS_TABSTOP, 0,
-            L"BUTTON", L"Mount");
-        addItem(BTN2_X, R3, DLG_BTN_W, DLG_BTN_H,
+            L"BUTTON", L10n::S("dlg_mount_btn"));
+        addItemA(BTN2_X, R3, DLG_BTN_W, DLG_BTN_H,
             IDCANCEL, BS_PUSHBUTTON | WS_TABSTOP, 0,
-            L"BUTTON", L"Cancel");
+            L"BUTTON", L10n::S("dlg_cancel_btn"));
     }
     else {
+        // Config-режим: checkbox + мітка мови + два radio + OK + Cancel
+
         // Рядок 1 — Read-only (y=14)
         const short R1 = DLG_FIRST_ROW;
-        addItem(PAD, R1, INNER, 10,
-            IDC_CHK_READONLY,
-            BS_AUTOCHECKBOX | WS_TABSTOP, 0,
-            L"BUTTON", L"Read-only access (default for new mounts)");
+        addItemA(PAD, R1, INNER, 10,
+            IDC_CHK_READONLY, BS_AUTOCHECKBOX | WS_TABSTOP, 0,
+            L"BUTTON", L10n::S("dlg_readonly_cfg"));
 
-        // Рядок 2 — кнопки (y=32)
-        const short R2 = R1 + DLG_ROW_H - 2;
-        addItem(BTN1_X, R2, DLG_BTN_W, DLG_BTN_H,
+        // Рядок 2 — мітка "Language:" + radio EN + radio UK (y=30)
+        const short R2 = R1 + DLG_ROW_H - 4;
+        const short LANG_LBL_W = 52;
+        const short RADIO_W = 40;
+        addItemA(PAD, R2 + 1, LANG_LBL_W, 9,
+            IDC_STATIC_LANG, SS_LEFT, 0,
+            L"STATIC", L10n::S("dlg_language_lbl"));
+        addItem(PAD + LANG_LBL_W + 2, R2, RADIO_W, 10,
+            IDC_RADIO_EN,
+            BS_AUTORADIOBUTTON | WS_TABSTOP | WS_GROUP, 0,
+            L"BUTTON", L"English");
+        addItem(PAD + LANG_LBL_W + 2 + RADIO_W + 4, R2, 60, 10,
+            IDC_RADIO_UK,
+            BS_AUTORADIOBUTTON | WS_TABSTOP, 0,
+            L"BUTTON", L"\u0423\u043a\u0440\u0430\u0457\u043d\u0441\u044c\u043a\u0430");
+        //           ↑ "Українська" в Unicode escape щоб уникнути проблем з кодуванням вихідника
+
+        // Рядок 3 — кнопки (y=50)
+        const short R3 = R2 + DLG_ROW_H;
+        addItemA(BTN1_X, R3, DLG_BTN_W, DLG_BTN_H,
             IDOK, BS_DEFPUSHBUTTON | WS_TABSTOP, 0,
-            L"BUTTON", L"OK");
-        addItem(BTN2_X, R2, DLG_BTN_W, DLG_BTN_H,
+            L"BUTTON", L10n::S("dlg_ok_btn"));
+        addItemA(BTN2_X, R3, DLG_BTN_W, DLG_BTN_H,
             IDCANCEL, BS_PUSHBUTTON | WS_TABSTOP, 0,
-            L"BUTTON", L"Cancel");
+            L"BUTTON", L10n::S("dlg_cancel_btn"));
     }
 
     GlobalUnlock(hMem);
@@ -288,20 +317,28 @@ static HGLOBAL BuildDialogTemplate(bool isMount)
 
 bool ShowConfigDialog(HWND parent, PluginConfig& cfg)
 {
-    MountDlgData data{ &cfg, true };
+    auto& ps = PluginState::Get();
+    MountDlgData data{ &cfg, true, ps.defaultLanguage };
     HGLOBAL hTmpl = BuildDialogTemplate(false);
     if (!hTmpl) return false;
 
     auto* pTmpl = (DLGTEMPLATE*)GlobalLock(hTmpl);
     if (!pTmpl) { GlobalFree(hTmpl); return false; }
 
-    INT_PTR r = DialogBoxIndirectParamA(
-        GetModuleHandleA(nullptr), pTmpl,
+    INT_PTR r = DialogBoxIndirectParamW(
+        GetModuleHandleW(nullptr), pTmpl,
         parent, MountDlgProc, (LPARAM)&data);
 
     GlobalUnlock(hTmpl);
     GlobalFree(hTmpl);
-    return r == IDOK;
+
+    if (r == IDOK) {
+        // Зберігаємо вибрану мову у стані плагіна та у файлі ini
+        ps.defaultLanguage = data.language;
+        ps.SaveConfig();
+        return true;
+    }
+    return false;
 }
 
 bool ShowMountDialog(HWND parent, PluginConfig& cfg)
@@ -313,8 +350,8 @@ bool ShowMountDialog(HWND parent, PluginConfig& cfg)
     auto* pTmpl = (DLGTEMPLATE*)GlobalLock(hTmpl);
     if (!pTmpl) { GlobalFree(hTmpl); return false; }
 
-    INT_PTR r = DialogBoxIndirectParamA(
-        GetModuleHandleA(nullptr), pTmpl,
+    INT_PTR r = DialogBoxIndirectParamW(
+        GetModuleHandleW(nullptr), pTmpl,
         parent, MountDlgProc, (LPARAM)&data);
 
     GlobalUnlock(hTmpl);

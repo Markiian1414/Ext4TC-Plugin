@@ -11,6 +11,7 @@
 #include "../ext/ext_reader.h"
 #include "../io/disk_scanner.h"
 #include "wfxplugin.h"
+#include "lang.h"
 
 // -------------------------------------------------------
 //  Збережені налаштування
@@ -62,6 +63,7 @@ public:
 
     bool defaultReadOnly;
     std::string defaultEncoding;
+    std::string defaultLanguage; // "EN" або "UK", зберігається в ext4tc.ini
 
     void LoadConfig();
     void SaveConfig();
