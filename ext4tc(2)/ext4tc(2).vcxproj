@@ -44,6 +44,9 @@
     <ClInclude Include="wfx\plugin_state.h" />
     <ClInclude Include="wfx\wfxplugin.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="ext4tc.rc" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
