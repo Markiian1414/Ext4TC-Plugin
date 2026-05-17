@@ -66,7 +66,7 @@ private:
     uint64_t InodeOffset(uint32_t inodeNum) const;
 
     bool CollectExtents(const ext2_inode& inode, std::vector<std::pair<uint64_t, uint64_t>>& logToPhys);
-    bool CollectIndirect(uint32_t blockNum, int depth, std::vector<uint64_t>& blocks);
+    bool CollectIndirect(uint32_t blockNum, int depth, std::vector<uint64_t>& blocks, int recursionDepth = 0);
     bool GetFileBlocks(const ext2_inode& inode, std::vector<std::pair<uint64_t, uint64_t>>& extents);
     bool ReadFileData(const ext2_inode& inode, uint32_t inodeNum, std::vector<uint8_t>& out);
     bool ParseDirectory(const ext2_inode& dirInode, uint32_t inodeNum, std::vector<ExtEntry>& out);

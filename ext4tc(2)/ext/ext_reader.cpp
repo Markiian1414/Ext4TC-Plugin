@@ -112,8 +112,8 @@ bool ExtReader::CollectExtents(const ext2_inode& inode,
     std::function<bool(const uint8_t*, int)> traverse =
         [&](const uint8_t* node, int depth) -> bool {
         const auto* h = (const ext4_extent_header*)node;
-        // Захист від пошкодженого заголовку: надто багато записів.
-        // Максимум залежить від розміру блоку, а не фіксований (340 було для 4096).
+        // Захист від пошкодженого заголовку: максимум залежить від розміру блоку,
+        // а не фіксований (340 було тільки для 4096-байтних блоків).
         const uint32_t maxEntries = (m_info.block_size - (uint32_t)sizeof(ext4_extent_header))
             / (uint32_t)sizeof(ext4_extent);
         if (h->eh_entries > maxEntries) return false;
@@ -145,8 +145,10 @@ bool ExtReader::CollectExtents(const ext2_inode& inode,
 }
 
 bool ExtReader::CollectIndirect(uint32_t blockNum, int depth,
-    std::vector<uint64_t>& blocks) {
-    if (blockNum == 0) return true;
+    std::vector<uint64_t>& blocks, int recursionDepth) {
+    // Захист від пошкодженої ФС: максимальна глибина = 3 (triple indirect).
+    // Якщо блок вказує сам на себе або ланцюг зациклився — зупиняємось.
+    if (blockNum == 0 || recursionDepth > 3) return true;
     std::vector<uint32_t> buf(m_info.block_size / 4);
     if (!ReadBlock(blockNum, buf.data())) return false;
 
@@ -155,7 +157,7 @@ bool ExtReader::CollectIndirect(uint32_t blockNum, int depth,
         if (depth == 0)
             blocks.push_back(buf[i]);
         else
-            CollectIndirect(buf[i], depth - 1, blocks);
+            CollectIndirect(buf[i], depth - 1, blocks, recursionDepth + 1);
     }
     return true;
 }
@@ -197,8 +199,7 @@ bool ExtReader::ReadFileData(const ext2_inode& inode, uint32_t inodeNum,
     if (extents.empty() && fileSize > 0) return false;
 
     // Сортуємо за логічним номером блоку: extent-дерево може повертати
-    // блоки не в порядку (наприклад після дефрагментації), а запис у out
-    // йде послідовно — без сортування дані будуть перемішані.
+    // блоки не в порядку (наприклад після дефрагментації).
     std::sort(extents.begin(), extents.end(),
         [](const std::pair<uint64_t, uint64_t>& a,
             const std::pair<uint64_t, uint64_t>& b) { return a.first < b.first; });

@@ -69,6 +69,13 @@ bool PluginState::MountVolume(const std::string& sourcePath,
     // Обгортаємо у try/catch: якщо CreateDiskSource або Mount кинуть
     // C++ виняток, mutex не залишиться захопленим назавжди
     try {
+        // Перевірка дублікатів: якщо цей самий sourcePath+offset вже змонтовано — повертаємо успіх
+        for (auto& v : volumes) {
+            if (v.sourcePath == sourcePath && v.partOffset == partOffset) {
+                return true;
+            }
+        }
+
         std::shared_ptr<IDiskSource> src = CreateDiskSource(sourcePath, readOnly);
         if (!src) {
             errorMsg = L10n::Fmt(L10n::S("err_no_src"), "{PATH}", sourcePath);
