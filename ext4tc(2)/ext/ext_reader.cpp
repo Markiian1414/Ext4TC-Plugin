@@ -112,9 +112,11 @@ bool ExtReader::CollectExtents(const ext2_inode& inode,
     std::function<bool(const uint8_t*, int)> traverse =
         [&](const uint8_t* node, int depth) -> bool {
         const auto* h = (const ext4_extent_header*)node;
-        // Захист від пошкодженого заголовку: надто багато записів
-        // (в одному блоці 4096 байт максимум (4096-12)/12 = 340 extent'ів)
-        if (h->eh_entries > 340) return false;
+        // Захист від пошкодженого заголовку: надто багато записів.
+        // Максимум залежить від розміру блоку, а не фіксований (340 було для 4096).
+        const uint32_t maxEntries = (m_info.block_size - (uint32_t)sizeof(ext4_extent_header))
+            / (uint32_t)sizeof(ext4_extent);
+        if (h->eh_entries > maxEntries) return false;
         if (h->eh_depth == 0) {
             const auto* ext = (const ext4_extent*)(node + sizeof(ext4_extent_header));
             for (int i = 0; i < h->eh_entries; i++) {
@@ -193,6 +195,13 @@ bool ExtReader::ReadFileData(const ext2_inode& inode, uint32_t inodeNum,
 
     // Якщо файл має розмір, але жодного блоку не знайдено — пошкоджена ФС
     if (extents.empty() && fileSize > 0) return false;
+
+    // Сортуємо за логічним номером блоку: extent-дерево може повертати
+    // блоки не в порядку (наприклад після дефрагментації), а запис у out
+    // йде послідовно — без сортування дані будуть перемішані.
+    std::sort(extents.begin(), extents.end(),
+        [](const std::pair<uint64_t, uint64_t>& a,
+            const std::pair<uint64_t, uint64_t>& b) { return a.first < b.first; });
 
     out.resize((size_t)fileSize);
     uint64_t written = 0;
@@ -347,6 +356,11 @@ bool ExtReader::ExtractFile(const std::string& extPath,
 
     std::vector<std::pair<uint64_t, uint64_t>> extents;
     if (!GetFileBlocks(inode, extents)) { CloseHandle(hOut); return false; }
+
+    // Сортуємо за логічним номером блоку (аналогічно ReadFileData)
+    std::sort(extents.begin(), extents.end(),
+        [](const std::pair<uint64_t, uint64_t>& a,
+            const std::pair<uint64_t, uint64_t>& b) { return a.first < b.first; });
 
     std::vector<uint8_t> blockBuf(m_info.block_size);
     uint64_t written = 0;

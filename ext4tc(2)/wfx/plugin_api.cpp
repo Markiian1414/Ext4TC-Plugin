@@ -17,6 +17,19 @@ static bool IsAdmin() {
     return IsUserAnAdmin() != FALSE;
 }
 
+// MessageBoxA не підтримує UTF-8 — кирилиця відображається як кракозябри.
+// Ця обгортка конвертує UTF-8 рядки у UTF-16 і викликає MessageBoxW.
+static int MsgBoxU(HWND hwnd, const char* textUtf8, const char* titleUtf8, UINT uType) {
+    auto toW = [](const char* s) -> std::wstring {
+        if (!s || !*s) return L"";
+        int n = MultiByteToWideChar(CP_UTF8, 0, s, -1, nullptr, 0);
+        std::wstring w(n, 0);
+        MultiByteToWideChar(CP_UTF8, 0, s, -1, w.data(), n);
+        return w;
+        };
+    return MessageBoxW(hwnd, toW(textUtf8).c_str(), toW(titleUtf8).c_str(), uType);
+}
+
 // ДОДАНО: Допоміжна функція для витягування імені файлу зі шляху
 static std::string GetFilenameFromPath(const std::string& path) {
     size_t found = path.find_last_of("/\\");
@@ -82,9 +95,10 @@ HANDLE __stdcall FsFindFirst(char* Path, WIN32_FIND_DATAA* FindData) {
     static bool adminWarningShown = false;
     if (volumeId.empty() && !adminWarningShown) {
         if (!IsAdmin()) {
-            MessageBoxA(NULL,
-                "Warning: Plugin is not running as Administrator.\nPhysical drive auto-detection is disabled.",
-                "ext4tc", MB_ICONWARNING | MB_OK);
+            MsgBoxU(NULL,
+                L10n::S("warn_admin_text"),
+                L10n::S("warn_admin_title"),
+                MB_ICONWARNING | MB_OK);
         }
         adminWarningShown = true;
     }
@@ -159,8 +173,8 @@ HANDLE __stdcall FsFindFirst(char* Path, WIN32_FIND_DATAA* FindData) {
                 if (!ps.volumes.empty()) ps.volumes.back().id = volumeId;
             }
             else {
-                std::string errorMsg = "Failed to auto-mount:\n" + err;
-                MessageBoxA(NULL, errorMsg.c_str(), "ext4tc — Mount Error", MB_ICONERROR | MB_OK);
+                std::string errorMsg = std::string(L10n::S("err_automount_pfx")) + err;
+                MsgBoxU(NULL, errorMsg.c_str(), L10n::S("err_mount_title"), MB_ICONERROR | MB_OK);
             }
         }
 
@@ -232,7 +246,7 @@ int __stdcall FsExecuteFile(HWND MainWin, char* RemoteName, char* Verb) {
 
                 return FS_EXEC_OK;
             }
-            MessageBoxA(MainWin, err.c_str(), "ext4tc \x97 Mount Error", MB_ICONERROR | MB_OK);
+            MsgBoxU(MainWin, err.c_str(), L10n::S("err_mount_title"), MB_ICONERROR | MB_OK);
         }
         return FS_EXEC_OK;
     }
@@ -260,11 +274,15 @@ int __stdcall FsExecuteFile(HWND MainWin, char* RemoteName, char* Verb) {
         if (vol) {
             ext2_inode inode{}; uint32_t inum = 0;
             if (vol->reader->GetInodeByPath(sub, inode, inum)) {
-                char info[512];
                 uint64_t sz = inode.i_size_lo | ((uint64_t)inode.i_size_hi << 32);
-                sprintf_s(info, sizeof(info), "Path: %s\nInode: %u\nSize: %llu bytes\n", sub.c_str(), inum, (unsigned long long)sz);
-                // Локалізував заодно заголовок вікна
-                MessageBoxA(MainWin, info, L10n::S("prop_title"), MB_ICONINFORMATION | MB_OK);
+                std::string info =
+                    L10n::Fmt(
+                        L10n::Fmt(
+                            L10n::Fmt(L10n::S("prop_format"),
+                                "{SUB}", sub).c_str(),
+                            "{INUM}", std::to_string(inum)).c_str(),
+                        "{SIZE}", std::to_string(sz));
+                MsgBoxU(MainWin, info.c_str(), L10n::S("prop_title"), MB_ICONINFORMATION | MB_OK);
             }
         }
         return FS_EXEC_OK;
@@ -278,14 +296,22 @@ int __stdcall FsGetFile(char* RemoteName, char* LocalName, int CopyFlags, Remote
     auto& ps = PluginState::Get();
     std::string volId, subPath;
     ps.ParsePath(RemoteName, volId, subPath);
-    MountedVolume* vol = ps.FindVolume(volId);
-    if (!vol) return FS_FILE_NOTFOUND;
+
+    // Отримуємо shared_ptr на reader під mutex, щоб він не знищився
+    // якщо том буде розмонтований з іншого потоку під час копіювання.
+    std::shared_ptr<ExtReader> reader;
+    {
+        std::lock_guard<std::mutex> lk(ps.mutex);
+        MountedVolume* vol = ps.FindVolume(volId);
+        if (!vol) return FS_FILE_NOTFOUND;
+        reader = vol->reader;
+    }
 
     auto progress = [&](uint64_t d, uint64_t t) -> bool {
         if (!ps.progressProc) return true;
         return ps.progressProc(ps.pluginNr, RemoteName, LocalName, t ? (int)(d * 100 / t) : 100) == 0;
         };
-    return vol->reader->ExtractFile(subPath, LocalName, progress) ? FS_FILE_OK : FS_FILE_READERROR;
+    return reader->ExtractFile(subPath, LocalName, progress) ? FS_FILE_OK : FS_FILE_READERROR;
 }
 
 int __stdcall FsPutFile(char* LocalName, char* RemoteName, int CopyFlags) {
@@ -326,27 +352,29 @@ void __stdcall FsStatusInfo(char* RemoteDir, int InfoStartEnd, int Operation) {
     if (!ps.logProc) return;
 
     // Назви операцій для лога (відповідають константам WFX API)
-    const char* opName = "Unknown";
+    const char* opName = L10n::S("log_op_unknown");
     switch (Operation) {
-    case 1:  opName = "List directory";  break;
-    case 2:  opName = "Get file";        break;
-    case 3:  opName = "Put file";        break;
-    case 4:  opName = "Rename/Move";     break;
-    case 5:  opName = "Delete";          break;
-    case 6:  opName = "Attributes";      break;
-    case 7:  opName = "Execute";         break;
-    case 8:  opName = "Calculate size";  break;
-    case 9:  opName = "Search";          break;
-    case 10: opName = "Search text";     break;
-    case 11: opName = "Synchronize";     break;
+    case 1:  opName = L10n::S("log_op_list");        break;
+    case 2:  opName = L10n::S("log_op_get");         break;
+    case 3:  opName = L10n::S("log_op_put");         break;
+    case 4:  opName = L10n::S("log_op_rename");      break;
+    case 5:  opName = L10n::S("log_op_delete");      break;
+    case 6:  opName = L10n::S("log_op_attr");        break;
+    case 7:  opName = L10n::S("log_op_exec");        break;
+    case 8:  opName = L10n::S("log_op_calcsize");    break;
+    case 9:  opName = L10n::S("log_op_search");      break;
+    case 10: opName = L10n::S("log_op_searchtext");  break;
+    case 11: opName = L10n::S("log_op_sync");        break;
     }
 
-    char msg[512];
-    _snprintf_s(msg, sizeof(msg), _TRUNCATE,
-        "ext4tc: %s — %s [%s]",
-        opName,
-        RemoteDir ? RemoteDir : "",
-        InfoStartEnd == 0 ? "start" : "end");
+    const char* phase = InfoStartEnd == 0 ? L10n::S("log_phase_start") : L10n::S("log_phase_end");
+    std::string msg =
+        L10n::Fmt(
+            L10n::Fmt(
+                L10n::Fmt(L10n::S("log_status_fmt"),
+                    "{OP}", opName).c_str(),
+                "{DIR}", RemoteDir ? RemoteDir : "").c_str(),
+            "{PHASE}", phase);
     ps.Log(MSGTYPE_DETAILS, msg);
 }
 int __stdcall FsGetBackgroundFlags(void) { return BG_DOWNLOAD; }

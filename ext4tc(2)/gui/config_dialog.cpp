@@ -9,6 +9,18 @@
 
 #pragma comment(lib, "comdlg32.lib")
 
+// MessageBoxA не підтримує UTF-8. Ця обгортка викликає MessageBoxW.
+static int MsgBoxU(HWND hwnd, const char* textUtf8, const char* titleUtf8, UINT uType) {
+    auto toW = [](const char* s) -> std::wstring {
+        if (!s || !*s) return L"";
+        int n = MultiByteToWideChar(CP_UTF8, 0, s, -1, nullptr, 0);
+        std::wstring w(n, 0);
+        MultiByteToWideChar(CP_UTF8, 0, s, -1, w.data(), n);
+        return w;
+        };
+    return MessageBoxW(hwnd, toW(textUtf8).c_str(), toW(titleUtf8).c_str(), uType);
+}
+
 // -------------------------------------------------------
 //  Layout constants (dialog units)
 // -------------------------------------------------------
@@ -98,7 +110,7 @@ static INT_PTR CALLBACK MountDlgProc(HWND hDlg, UINT msg,
 
                 // 1. Порожній рядок
                 if (buf[0] == '\0') {
-                    MessageBoxA(hDlg,
+                    MsgBoxU(hDlg,
                         L10n::S("val_empty_text"),
                         L10n::S("val_empty_title"),
                         MB_ICONWARNING | MB_OK);
@@ -113,13 +125,13 @@ static INT_PTR CALLBACK MountDlgProc(HWND hDlg, UINT msg,
                     DWORD attr = GetFileAttributesA(buf);
                     if (attr == INVALID_FILE_ATTRIBUTES) {
                         std::string msg = L10n::Fmt(L10n::S("val_notfound_text"), "{PATH}", buf);
-                        MessageBoxA(hDlg, msg.c_str(),
+                        MsgBoxU(hDlg, msg.c_str(),
                             L10n::S("val_notfound_title"), MB_ICONWARNING | MB_OK);
                         SetFocus(GetDlgItem(hDlg, IDC_EDIT_PATH));
                         break;
                     }
                     if (attr & FILE_ATTRIBUTE_DIRECTORY) {
-                        MessageBoxA(hDlg,
+                        MsgBoxU(hDlg,
                             L10n::S("val_isdir_text"),
                             L10n::S("val_isdir_title"),
                             MB_ICONWARNING | MB_OK);
@@ -164,8 +176,8 @@ static INT_PTR CALLBACK MountDlgProc(HWND hDlg, UINT msg,
 static HGLOBAL BuildDialogTemplate(bool isMount)
 {
     // Mount: 6 контролів; Config: 6 (checkbox + label + 2 radio + OK + Cancel)
-    const short itemCount = isMount ? 6 : 6;
-    const short dlgH = isMount ? 78 : 78; // Config тепер вищий — є рядок мови
+    const short itemCount = 6;
+    const short dlgH = 78;
 
     HGLOBAL hMem = GlobalAlloc(GMEM_ZEROINIT, 8192);
     if (!hMem) return nullptr;

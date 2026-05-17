@@ -13,16 +13,16 @@
 
 struct ExtEntry {
     std::string  name;
-    uint32_t     inode_num;
-    bool         is_dir;
-    bool         is_symlink;
-    uint64_t     size;
-    uint32_t     uid;
-    uint32_t     gid;
-    uint16_t     mode;
-    time_t       atime;
-    time_t       mtime;
-    time_t       ctime;
+    uint32_t     inode_num = 0;
+    bool         is_dir = false;
+    bool         is_symlink = false;
+    uint64_t     size = 0;
+    uint32_t     uid = 0;
+    uint32_t     gid = 0;
+    uint16_t     mode = 0;
+    time_t       atime = 0;
+    time_t       mtime = 0;
+    time_t       ctime = 0;
     std::string  link_target;
 };
 
@@ -53,10 +53,10 @@ public:
 
 private:
     std::shared_ptr<IDiskSource> m_src;
-    uint64_t  m_partOffset;
-    bool      m_mounted;
-    ExtFsInfo m_info;
-    ext2_super_block m_sb;
+    uint64_t  m_partOffset = 0;
+    bool      m_mounted = false;
+    ExtFsInfo m_info = {};
+    ext2_super_block m_sb = {};
 
     bool ReadSuperblock();
     bool ReadBlock(uint64_t blockNum, void* buf, uint32_t size = 0);
