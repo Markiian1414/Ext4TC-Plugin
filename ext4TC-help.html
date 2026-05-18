@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="uk" id="html-root">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ext4TC v2.0 — Довідка / Help</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg:        #f8faf8;
+    --bg2:       #ffffff;
+    --bg3:       #f0f5f0;
+    --border:    #d0e0d0;
+    --green:     #2a7a4b;
+    --green-lt:  #3da066;
+    --green-bg:  #e8f5ee;
+    --green-dim: #c8e6d4;
+    --warn-bg:   #fff8e8;
+    --warn:      #b07a10;
+    --warn-bdr:  #e6c060;
+    --text:      #1a2a1a;
+    --text-dim:  #5a7a5a;
+    --text-head: #0f1f0f;
+    --mono:      'IBM Plex Mono', monospace;
+    --sans:      'IBM Plex Sans', sans-serif;
+    --radius:    8px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14.5px;
+    line-height: 1.65;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--green);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .logo {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    font-family: var(--mono);
+    letter-spacing: -0.5px;
+  }
+
+  .logo span { color: #7fffa0; }
+
+  .version {
+    background: rgba(255,255,255,0.15);
+    color: #cfffdc;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .lang-switcher {
+    margin-left: auto;
+    display: flex;
+    gap: 6px;
+  }
+
+  .lang-btn {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+
+  .lang-btn.active,
+  .lang-btn:hover {
+    background: rgba(255,255,255,0.28);
+  }
+
+  /* ── CONTENT ── */
+  main {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 36px 28px 64px;
+  }
+
+  /* ── TAGLINE ── */
+  .tagline {
+    color: var(--text-dim);
+    font-size: 13px;
+    font-family: var(--mono);
+    margin-bottom: 36px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--border);
+  }
+
+  /* ── SECTION ── */
+  section { margin-bottom: 40px; }
+
+  h2 {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--green);
+    font-family: var(--mono);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  h2::before {
+    content: '';
+    display: inline-block;
+    width: 3px;
+    height: 16px;
+    background: var(--green);
+    border-radius: 2px;
+  }
+
+  p { margin-bottom: 10px; color: var(--text); }
+
+  /* ── STEPS ── */
+  .steps { list-style: none; }
+
+  .steps li {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 8px;
+    align-items: flex-start;
+  }
+
+  .step-num {
+    min-width: 22px;
+    height: 22px;
+    background: var(--green);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* ── CODE ── */
+  code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--green-bg);
+    border: 1px solid var(--green-dim);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--green);
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--green-lt);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 14px 16px;
+    margin: 8px 0 12px;
+    overflow-x: auto;
+    color: var(--green);
+    line-height: 1.7;
+  }
+
+  /* ── NOTE / WARN ── */
+  .note {
+    background: var(--green-bg);
+    border-left: 3px solid var(--green-lt);
+    padding: 10px 14px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    margin: 10px 0;
+    font-size: 13px;
+    color: var(--green);
+  }
+
+  .warn {
+    background: var(--warn-bg);
+    border-left: 3px solid var(--warn-bdr);
+    padding: 10px 14px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    margin: 10px 0;
+    font-size: 13px;
+    color: var(--warn);
+  }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    margin-bottom: 12px;
+  }
+
+  .card-title {
+    font-weight: 600;
+    color: var(--text-head);
+    font-size: 13.5px;
+    margin-bottom: 6px;
+  }
+
+  .card p { margin: 0; font-size: 13px; }
+
+  /* ── TABLE ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    margin-bottom: 16px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  th {
+    background: var(--bg3);
+    color: var(--text-dim);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .8px;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+  }
+
+  td {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  .yes {
+    color: var(--green);
+    font-weight: 700;
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--green-bg);
+    padding: 1px 7px;
+    border-radius: 3px;
+  }
+
+  .no {
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--bg3);
+    padding: 1px 7px;
+    border-radius: 3px;
+  }
+
+  /* ── FILE TREE ── */
+  .file-tree {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    line-height: 2;
+    color: var(--text-dim);
+  }
+
+  .file-tree .dir  { color: var(--green); font-weight: 600; }
+  .file-tree .file { color: var(--text); }
+  .file-tree .cmt  { color: var(--text-dim); }
+
+  /* ── DIVIDER ── */
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 40px 0;
+  }
+
+  /* ── LANG SWITCH ── */
+  [data-lang="en"] { display: none; }
+  body.en [data-lang="uk"] { display: none; }
+  body.en [data-lang="en"] { display: revert; }
+  body.en span[data-lang="en"],
+  body.en strong[data-lang="en"],
+  body.en code[data-lang="en"] { display: inline; }
+  body.en td[data-lang="en"] { display: table-cell; }
+
+  @media (max-width: 600px) {
+    header { padding: 14px 18px; flex-wrap: wrap; }
+    main { padding: 24px 16px 48px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Ext<span>4</span>TC</div>
+  <div class="version">v2.0.0</div>
+  <div class="lang-switcher">
+    <button class="lang-btn active" onclick="setLang('uk')" id="btn-uk">🇺🇦 УК</button>
+    <button class="lang-btn" onclick="setLang('en')" id="btn-en">🇬🇧 EN</button>
+  </div>
+</header>
+
+<main>
+
+  <p class="tagline" data-lang="uk">Плагін файлової системи (WFX) для Total Commander · Ext2 / Ext3 / Ext4 · Windows x64</p>
+  <p class="tagline" data-lang="en">File System Plugin (WFX) for Total Commander · Ext2 / Ext3 / Ext4 · Windows x64</p>
+
+  <!-- ОПИС -->
+  <section>
+    <h2><span data-lang="uk">Опис</span><span data-lang="en">Description</span></h2>
+    <p data-lang="uk"><strong>Ext4TC</strong> — плагін для Total Commander, що надає прямий доступ до Linux-розділів <strong>Ext2/3/4</strong>, образів дисків <code>.img</code> та віртуальних дисків <code>.vhd</code> прямо з Windows. Не потрібно встановлювати драйвери або завантажувати Linux.</p>
+    <p data-lang="en"><strong>Ext4TC</strong> is a Total Commander plugin for direct access to Linux <strong>Ext2/3/4</strong> partitions, disk images <code>.img</code>, and virtual drives <code>.vhd</code> — directly from Windows. No drivers or Linux boot required.</p>
+    <p data-lang="uk" style="color:var(--text-dim); font-size:13px;">Проєкт розроблено в рамках курсової роботи з системного програмного забезпечення.</p>
+    <p data-lang="en" style="color:var(--text-dim); font-size:13px;">Developed as a coursework project in system software engineering.</p>
+  </section>
+
+  <!-- ВИМОГИ -->
+  <section>
+    <h2><span data-lang="uk">Системні вимоги</span><span data-lang="en">Requirements</span></h2>
+    <table>
+      <thead>
+        <tr>
+          <th data-lang="uk">Компонент</th><th data-lang="en">Component</th>
+          <th data-lang="uk">Вимога</th><th data-lang="en">Requirement</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td data-lang="uk">ОС</td><td data-lang="en">OS</td>
+          <td data-lang="uk">Windows 10 / 11 (64-bit)</td><td data-lang="en">Windows 10 / 11 (64-bit)</td>
+        </tr>
+        <tr>
+          <td data-lang="uk">Total Commander</td><td data-lang="en">Total Commander</td>
+          <td data-lang="uk">9.0+ (x64)</td><td data-lang="en">9.0+ (x64)</td>
+        </tr>
+        <tr>
+          <td data-lang="uk">Права</td><td data-lang="en">Privileges</td>
+          <td data-lang="uk">Адмін — для фізичних дисків</td><td data-lang="en">Admin — for physical drives</td>
+        </tr>
+        <tr>
+          <td data-lang="uk">Місце</td><td data-lang="en">Disk space</td>
+          <td>&lt; 1 MB</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ВСТАНОВЛЕННЯ -->
+  <section>
+    <h2><span data-lang="uk">Встановлення</span><span data-lang="en">Installation</span></h2>
+
+    <div class="card">
+      <div class="card-title" data-lang="uk">🚀 Варіант 1 — Автоматичне (рекомендовано)</div>
+      <div class="card-title" data-lang="en">🚀 Option 1 — Automatic (recommended)</div>
+      <ul class="steps" style="margin-top:10px">
+        <li><span class="step-num">1</span><span data-lang="uk">Відкрийте Total Commander.</span><span data-lang="en">Open Total Commander.</span></li>
+        <li><span class="step-num">2</span><span data-lang="uk">Зайдіть всередину архіву <code>ext4tc_v2.0.zip</code>.</span><span data-lang="en">Navigate into <code>ext4tc_v2.0.zip</code> in the file panel.</span></li>
+        <li><span class="step-num">3</span><span data-lang="uk">TC розпізнає <code>pluginst.inf</code> і запропонує встановлення — натисніть <strong>Так</strong>.</span><span data-lang="en">TC detects <code>pluginst.inf</code> and offers to install — click <strong>Yes</strong>.</span></li>
+        <li><span class="step-num">4</span><span data-lang="uk">Оберіть папку та перезапустіть Total Commander.</span><span data-lang="en">Choose a folder and restart Total Commander.</span></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-title" data-lang="uk">🔧 Варіант 2 — Ручне</div>
+      <div class="card-title" data-lang="en">🔧 Option 2 — Manual</div>
+      <ul class="steps" style="margin-top:10px">
+        <li><span class="step-num">1</span><span data-lang="uk">Скопіюйте <code>ext4tc.wfx64</code> у папку плагінів:</span><span data-lang="en">Copy <code>ext4tc.wfx64</code> to a plugins folder:</span></li>
+      </ul>
+      <pre>%COMMANDER_PATH%\Plugins\wfx\ext4tc\ext4tc.wfx64</pre>
+      <ul class="steps">
+        <li><span class="step-num">2</span><span data-lang="uk">Конфігурація → Налаштування → Плагіни → <em>WFX</em> → <strong>Додати</strong>.</span><span data-lang="en">Configuration → Options → Plugins → <em>WFX</em> → <strong>Add</strong>.</span></li>
+        <li><span class="step-num">3</span><span data-lang="uk">Вкажіть шлях до <code>ext4tc.wfx64</code> → OK → перезапустіть TC.</span><span data-lang="en">Point to <code>ext4tc.wfx64</code> → OK → restart TC.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ВИКОРИСТАННЯ -->
+  <section>
+    <h2><span data-lang="uk">Використання</span><span data-lang="en">Usage</span></h2>
+    <ul class="steps">
+      <li><span class="step-num">1</span><span data-lang="uk">У панелі дисків натисніть <strong>«Мережа»</strong> або введіть <code>\\Network</code> в адресний рядок.</span><span data-lang="en">In the drive panel click <strong>"Network"</strong> or type <code>\\Network</code> in the address bar.</span></li>
+      <li><span class="step-num">2</span><span data-lang="uk">Відкрийте <code>[Ext2/3/4 Filesystem]</code> — плагін автоматично знайде Ext-розділи.</span><span data-lang="en">Open <code>[Ext2/3/4 Filesystem]</code> — the plugin will scan and list Ext partitions.</span></li>
+      <li><span class="step-num">3</span><span data-lang="uk">Для підключення нового образу чи диска двічі натисніть <code>💿 &lt; Монтувати новий том &gt;</code>.</span><span data-lang="en">To mount a new image or drive, double-click <code>💿 &lt; Mount new volume &gt;</code>.</span></li>
+      <li><span class="step-num">4</span><span data-lang="uk">Вкажіть шлях до <code>.img</code> / <code>.vhd</code> або <code>\\.\PhysicalDrive0</code>, оберіть режим та натисніть <strong>«Монтувати»</strong>.</span><span data-lang="en">Enter path to <code>.img</code> / <code>.vhd</code> or <code>\\.\PhysicalDrive0</code>, choose mode, click <strong>"Mount"</strong>.</span></li>
+      <li><span class="step-num">5</span><span data-lang="uk">Копіюйте файли стандартною командою <strong>F5</strong>.</span><span data-lang="en">Copy files using the standard <strong>F5</strong> command.</span></li>
+    </ul>
+
+    <div class="note" data-lang="uk">💡 <strong>Alt + Enter</strong> у кореневій папці плагіна відкриває налаштування (мова, режим доступу).</div>
+    <div class="note" data-lang="en">💡 <strong>Alt + Enter</strong> in the plugin root opens settings (language, access mode).</div>
+
+    <div class="warn" data-lang="uk">⚠ Для доступу до фізичних дисків запустіть Total Commander <strong>від імені Адміністратора</strong>.</div>
+    <div class="warn" data-lang="en">⚠ To access physical drives, run Total Commander <strong>as Administrator</strong>.</div>
+  </section>
+
+  
+
+  <!-- СТРУКТУРА -->
+  <section>
+    <h2><span data-lang="uk">Структура пакету</span><span data-lang="en">Package Structure</span></h2>
+    <div class="file-tree">
+      <span class="dir">ext4tc_v2.0/</span><br>
+      ├── <span class="file">ext4tc.wfx64</span>    <span class="cmt"># основний 64-bit бінарний файл плагіна</span><br>
+      ├── <span class="file">pluginst.inf</span>    <span class="cmt"># автоматичне встановлення в TC</span><br>
+      ├── <span class="file">ext4tc_help.html</span> <span class="cmt"># цей файл довідки</span><br>
+      └── <span class="file">README.txt</span>      <span class="cmt"># короткий опис</span>
+    </div>
+    <p style="margin-top:10px; font-size:13px; color:var(--text-dim)" data-lang="uk">Файл <code>ext4tc.ini</code> створюється автоматично при першому запуску.</p>
+    <p style="margin-top:10px; font-size:13px; color:var(--text-dim)" data-lang="en"><code>ext4tc.ini</code> is created automatically on first launch.</p>
+  </section>
+
+  <!-- FAQ -->
+  <section>
+    <h2>FAQ</h2>
+
+    <div class="card">
+      <div class="card-title" data-lang="uk">Плагін не бачить фізичні диски</div>
+      <div class="card-title" data-lang="en">Plugin doesn't see physical drives</div>
+      <p data-lang="uk">Запустіть Total Commander від імені Адміністратора (ПКМ → «Запустити від імені адміністратора»).</p>
+      <p data-lang="en">Run Total Commander as Administrator (right-click → "Run as administrator").</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title" data-lang="uk">Помилка «No Ext2/3/4 filesystem found»</div>
+      <div class="card-title" data-lang="en">Error "No Ext2/3/4 filesystem found"</div>
+      <p data-lang="uk">Перевірте: правильний індекс диска (<code>PhysicalDrive0</code>, <code>1</code>…), файл є сирим образом (не ISO/VMDK), образ не пошкоджений.</p>
+      <p data-lang="en">Check: correct drive index (<code>PhysicalDrive0</code>, <code>1</code>…), file is a raw image (not ISO/VMDK), image is not corrupted.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title" data-lang="uk">Кирилиця в іменах файлів відображається некоректно</div>
+      <div class="card-title" data-lang="en">Cyrillic filenames display incorrectly</div>
+      <p data-lang="uk">Переконайтесь, що в налаштуваннях плагіна обрано кодування <code>UTF-8</code>.</p>
+      <p data-lang="en">Make sure <code>UTF-8</code> encoding is selected in plugin settings.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title" data-lang="uk">Як змінити мову інтерфейсу?</div>
+      <div class="card-title" data-lang="en">How to change the interface language?</div>
+      <p data-lang="uk">Перейдіть у кореневу папку плагіна → натисніть <strong>Alt + Enter</strong> → оберіть мову → OK.</p>
+      <p data-lang="en">Go to the plugin root → press <strong>Alt + Enter</strong> → choose language → OK.</p>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  function setLang(lang) {
+    document.body.classList.toggle('en', lang === 'en');
+    document.getElementById('btn-uk').classList.toggle('active', lang === 'uk');
+    document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+    document.getElementById('html-root').setAttribute('lang', lang);
+  }
+</script>
+
+</body>
+</html>
