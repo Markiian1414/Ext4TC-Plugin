@@ -19,33 +19,33 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <None Include="ext4tc.def" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="ext\ext_reader.cpp" />
-    <ClCompile Include="gui\config_dialog.cpp" />
-    <ClCompile Include="io\disk_scanner.cpp" />
-    <ClCompile Include="io\disk_source_factory.cpp" />
-    <ClCompile Include="io\image_source.cpp" />
-    <ClCompile Include="io\physical_source.cpp" />
-    <ClCompile Include="wfx\plugin_api.cpp" />
-    <ClCompile Include="wfx\plugin_state.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ext\ext_reader.h" />
-    <ClInclude Include="ext\ext_types.h" />
-    <ClInclude Include="gui\config_dialog.h" />
-    <ClInclude Include="io\disk_scanner.h" />
-    <ClInclude Include="io\disk_source.h" />
-    <ClInclude Include="io\image_source.h" />
-    <ClInclude Include="io\physical_source.h" />
-    <ClInclude Include="wfx\lang.h" />
-    <ClInclude Include="wfx\plugin_state.h" />
-    <ClInclude Include="wfx\wfxplugin.h" />
-  </ItemGroup>
-  <ItemGroup>
     <ResourceCompile Include="ext4tc.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\dllmain.cpp" />
+    <ClCompile Include="src\ext\ext_reader.cpp" />
+    <ClCompile Include="src\gui\config_dialog.cpp" />
+    <ClCompile Include="src\io\disk_scanner.cpp" />
+    <ClCompile Include="src\io\disk_source_factory.cpp" />
+    <ClCompile Include="src\io\image_source.cpp" />
+    <ClCompile Include="src\io\physical_source.cpp" />
+    <ClCompile Include="src\wfx\plugin_api.cpp" />
+    <ClCompile Include="src\wfx\plugin_state.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\ext\ext_reader.h" />
+    <ClInclude Include="src\ext\ext_types.h" />
+    <ClInclude Include="src\gui\config_dialog.h" />
+    <ClInclude Include="src\io\disk_scanner.h" />
+    <ClInclude Include="src\io\disk_source.h" />
+    <ClInclude Include="src\io\image_source.h" />
+    <ClInclude Include="src\io\physical_source.h" />
+    <ClInclude Include="src\wfx\lang.h" />
+    <ClInclude Include="src\wfx\plugin_state.h" />
+    <ClInclude Include="src\wfx\wfxplugin.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\ext4tc.def" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -113,11 +113,13 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
+      <ModuleDefinitionFile>src\ext4tc.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -130,6 +132,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -137,6 +140,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
+      <ModuleDefinitionFile>src\ext4tc.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -147,14 +151,14 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <ModuleDefinitionFile>ext4tc.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>src\ext4tc.def</ModuleDefinitionFile>
       <AdditionalDependencies>Shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -168,7 +172,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
@@ -178,7 +182,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <ModuleDefinitionFile>ext4tc.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>src\ext4tc.def</ModuleDefinitionFile>
       <AdditionalDependencies>Shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
