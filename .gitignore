@@ -13,6 +13,9 @@ Release/
 
 # Ігнор важких образів дисків
 *.img
+!tests/text_ext2.img
+!tests/text_ext3.img
+!tests/text_ext4.img
 *.vhd
 *.vhdx
 *.iso
